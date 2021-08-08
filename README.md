@@ -1,3 +1,8 @@
+# mods:
+24 LEDs on pc edge
+ESP32 instead of a teensy/teensyduino
+Includes KiCad files
+
 # nogasm
 Software and hardware for Arduino-based orgasm prediction / detection
 
