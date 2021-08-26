@@ -54,6 +54,7 @@ void setup() {
     leds[dot] = CRGB::Black;
   }
   WiFi.mode(WIFI_STA);
+  WiFi.setHostname(hostname);
   WiFi.begin(ssid, password);
   wifiActive = (WiFi.waitForConnectResult() == WL_CONNECTED);
   otaActive = wifiActive;
