@@ -46,14 +46,14 @@
  * to reset.
  */
 //=======Libraries===============================
-#include <Encoder.h>
+#include <ESP32Encoder.h>
 #include <EEPROM.h>
 #include <FastLED.h>
 #include <RunningAverage.h>
 #include <WiFi.h>
 #include <ESPmDNS.h>
 #include <WifiUdp.h>
-#include <ArdunioOTA.h>
+#include <ArduinoOTA.h>
 
 //=======Hardware Setup===============================
 //LEDs
@@ -65,25 +65,26 @@
 
 //Encoder
 #define ENC_SW   13 //Pushbutton on the encoder
-Encoder myEnc(14, 15); //Quadrature inputs on pins 7,8
+ESP32Encoder myEnc;
 
 //DIP Switches
 #define SW1PIN 32 //Dip switch pins, for setting software options without reflashing code
-#define SW2PIN 33
+#define SW2PIN 12
 #define SW3PIN 34
 #define SW4PIN 35
 
 //Motor
 #define MOTPIN 17
+#define MOT_CHAN 0
 
 //Pressure Sensor Analog In
-#define BUTTPIN 12
+#define BUTTPIN 33
 
 //=======Software/Timing options=====================
 // OTA Settings
 const char* ssid = "esp-update-net";
 const char* password = "supersavepw";
-const char* hostname = "nogasm32"
+const char* hostname = "nogasm32";
 bool otaActive = false;
 int dot = 0;
 
@@ -149,6 +150,7 @@ float motSpeed = 0; //Motor speed, 0-255 (float to maintain smooth ramping to lo
 //=======Setup=======================================
 //Beep out tones over the motor by frequency (1047,1396,2093) may work well
 void beep_motor(int f1, int f2, int f3){
+  /*
   if(motSpeed > 245) analogWrite(MOTPIN, 245); //make sure the frequency is audible
   else if(motSpeed < 10) analogWrite(MOTPIN, 10);
   analogWriteFrequency(MOTPIN, f1);
@@ -158,10 +160,14 @@ void beep_motor(int f1, int f2, int f3){
   analogWriteFrequency(MOTPIN, f3);
   delay(250);
   analogWriteFrequency(MOTPIN, 440);
-  analogWrite(MOTPIN,motSpeed);
+  analogWrite(MOTPIN,motSpeed);*/
 }
 
 void setup() {
+  FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
+  // limit power draw to .6A at 5v... Didn't seem to work in my FastLED version though
+  //FastLED.setMaxPowerInVoltsAndMilliamps(5,DEFAULT_PLIMIT);
+  FastLED.setBrightness(BRIGHTNESS);
   // OTA Setup
   // Wait for boot
   for(int dot = 0; dot < NUM_LEDS; dot++)
@@ -179,7 +185,7 @@ void setup() {
     leds[dot] = CRGB::Black;
   }
   WiFi.mode(WIFI_STA);
-  Wifi.begin(ssid, password);
+  WiFi.begin(ssid, password);
   otaActive = (WiFi.waitForConnectResult() == WL_CONNECTED);
   // Setup OTA only if WiFi connected
   if(otaActive)
@@ -200,65 +206,56 @@ void setup() {
     }
     FastLED.show();
   }
-  else // Nogasm Setup
-  {
-    pinMode(ENC_SW,   INPUT); //Pin to read quadrature pulses from encoder
 
-    pinMode(SW1PIN,   INPUT); //Set DIP switch pins as inputs
-    pinMode(SW2PIN,   INPUT);
-    pinMode(SW3PIN,   INPUT);
-    pinMode(SW4PIN,   INPUT);
+  pinMode(ENC_SW,   INPUT); //Pin to read quadrature pulses from encoder
 
-    digitalWrite(SW1PIN, HIGH); //Enable pullup resistors on DIP switch pins.
-    digitalWrite(SW2PIN, HIGH); //They are tied to GND when switched on.
-    digitalWrite(SW3PIN, HIGH);
-    digitalWrite(SW4PIN, HIGH);
+  myEnc.attachHalfQuad(15, 14); //encoder inputs on pins 14,15
 
-    pinMode(MOTPIN,OUTPUT); //Enable "analog" out (PWM)
-    
-    pinMode(BUTTPIN,INPUT); //default is 10 bit resolution (1024), 0-3.3
-    analogReadRes(12); //changing ADC resolution to 12 bits (4095)
-    analogReadAveraging(32); //To reduce noise, average 32 samples each read.
-    
-    raPressure.clear(); //Initialize a running pressure average
+  pinMode(SW1PIN,   INPUT_PULLUP); //Set DIP switch pins as inputs
+  pinMode(SW2PIN,   INPUT_PULLUP);
+  pinMode(SW3PIN,   INPUT_PULLUP);
+  pinMode(SW4PIN,   INPUT_PULLUP);
 
-    digitalWrite(MOTPIN, LOW);//Make sure the motor is off
+  pinMode(MOTPIN,OUTPUT); //Enable "analog" out (PWM)
+  
+  pinMode(BUTTPIN,INPUT); //default is 10 bit resolution (1024), 0-3.3
+  
+  raPressure.clear(); //Initialize a running pressure average
 
-    delay(3000); // 3 second delay for recovery
+  digitalWrite(MOTPIN, LOW);//Make sure the motor is off
+  ledcSetup(MOT_CHAN, 500, 8);
+  ledcAttachPin(MOTPIN, MOT_CHAN);
 
-    //If a pin reads low, the switch is enabled. Here, we read in the DIP settings
-    //Right now, only SW1 is used, for enabling higher maximum motor speed.
-    if(digitalRead(SW1PIN)){
-      MOT_MAX = 179; //At the default low position, limit the motor speed
-    }
-    else{
-      MOT_MAX = 255; //When SW1 is flipped high, allow higher motor speeds
-    }
-    SW2 = (digitalRead(SW2PIN) == LOW);
-    SW3 = (digitalRead(SW3PIN) == LOW);
-    SW4 = (digitalRead(SW4PIN) == LOW);
+  delay(3000); // 3 second delay for recovery
 
-    Serial.begin(115200);
-
-    FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
-    // limit power draw to .6A at 5v... Didn't seem to work in my FastLED version though
-    //FastLED.setMaxPowerInVoltsAndMilliamps(5,DEFAULT_PLIMIT);
-    FastLED.setBrightness(BRIGHTNESS);
-
-    //Recall saved settings from memory
-    sensitivity = EEPROM.read(SENSITIVITY_ADDR);
-    maxSpeed = min(EEPROM.read(MAX_SPEED_ADDR),MOT_MAX); //Obey the MOT_MAX the first power  cycle after chaning it.
-    beep_motor(1047,1396,2093); //Power on beep
+  //If a pin reads low, the switch is enabled. Here, we read in the DIP settings
+  //Right now, only SW1 is used, for enabling higher maximum motor speed.
+  if(digitalRead(SW1PIN)){
+    MOT_MAX = 179; //At the default low position, limit the motor speed
   }
+  else{
+    MOT_MAX = 255; //When SW1 is flipped high, allow higher motor speeds
+  }
+  SW2 = (digitalRead(SW2PIN) == LOW);
+  SW3 = (digitalRead(SW3PIN) == LOW);
+  SW4 = (digitalRead(SW4PIN) == LOW);
+
+  Serial.begin(115200);
+
+  //Recall saved settings from memory
+  sensitivity = EEPROM.read(SENSITIVITY_ADDR);
+  maxSpeed = min(EEPROM.read(MAX_SPEED_ADDR),MOT_MAX); //Obey the MOT_MAX the first power  cycle after chaning it.
+  beep_motor(1047,1396,2093); //Power on beep
 }
 
 //=======LED Drawing Functions=================
 
 void showKnobRGB(const CRGB& rgb)
 {
-  analogWrite(REDPIN,   rgb.r );
-  analogWrite(GREENPIN, rgb.g );
-  analogWrite(BLUEPIN,  rgb.b );
+  //this led does not exist
+  //analogWrite(REDPIN,   rgb.r );
+  //analogWrite(GREENPIN, rgb.g );
+  //analogWrite(BLUEPIN,  rgb.b );
 }
 
 //Draw a "cursor", one pixel representing either a pressure or encoder position value
@@ -308,9 +305,9 @@ void draw_bars_3(int pos,CRGB C1, CRGB C2, CRGB C3){
 //Provide a limited encoder reading corresponting to tacticle clicks on the knob.
 //Each click passes through 4 encoder pulses. This reduces it to 1 pulse per click
 int encLimitRead(int minVal, int maxVal){
-  if(myEnc.read()>maxVal*4)myEnc.write(maxVal*4);
-  else if(myEnc.read()<minVal*4) myEnc.write(minVal*4);
-  return constrain(myEnc.read()/4,minVal,maxVal);
+  if(myEnc.getCount()>maxVal*4)myEnc.setCount(maxVal*4);
+  else if(myEnc.getCount()<minVal*4) myEnc.setCount(minVal*4);
+  return constrain(myEnc.getCount()/4,minVal,maxVal);
 }
 
 //=======Program Modes/States==================
@@ -318,9 +315,9 @@ int encLimitRead(int minVal, int maxVal){
 // Manual vibrator control mode (red), still shows orgasm closeness in background
 void run_manual() {
   //In manual mode, only allow for 13 cursor positions, for adjusting motor speed.
-  int knob = encLimitRead(0,12);
-  motSpeed = map(knob, 0, 12, 0., (float)MOT_MAX);
-  analogWrite(MOTPIN, motSpeed);
+  int knob = encLimitRead(0,NUM_LEDS - 1);
+  motSpeed = map(knob, 0, NUM_LEDS - 1, 0., (float)MOT_MAX);
+  ledcWrite(MOT_CHAN, motSpeed);
 
   //gyrGraphDraw(avgPressure, 0, 4 * 3 * NUM_LEDS);
   int presDraw = map(constrain(pressure - avgPressure, 0, pLimit),0,pLimit,0,NUM_LEDS*3);
@@ -345,9 +342,9 @@ void run_auto() {
     motSpeed += motIncrement;
   }
   if (motSpeed > MOT_MIN) {
-    analogWrite(MOTPIN, (int) motSpeed);
+    ledcWrite(MOT_CHAN, (int) motSpeed);
   } else {
-    analogWrite(MOTPIN, 0);
+    ledcWrite(MOT_CHAN, 0);
   }
 
   int presDraw = map(constrain(pressure - avgPressure, 0, pLimit),0,pLimit,0,NUM_LEDS*3);
@@ -359,9 +356,9 @@ void run_auto() {
 //Setting menu for adjusting the maximum vibrator speed automatic mode will ramp up to
 void run_opt_speed() {
   Serial.println("speed settings");
-  int knob = encLimitRead(0,12);
-  motSpeed = map(knob, 0, 12, 0., (float)MOT_MAX);
-  analogWrite(MOTPIN, motSpeed);
+  int knob = encLimitRead(0,NUM_LEDS - 1);
+  motSpeed = map(knob, 0, NUM_LEDS - 1, 0., (float)MOT_MAX);
+  ledcWrite(MOT_CHAN, motSpeed);
   maxSpeed = motSpeed; //Set the maximum ramp-up speed in automatic mode
   //Little animation to show ramping up on the LEDs
   static int visRamp = 0;
@@ -459,9 +456,9 @@ uint8_t set_state(uint8_t btnState, uint8_t state){
     fill_gradient_RGB(leds,0,CRGB::Black,NUM_LEDS-1,CRGB::Black);//Turn off LEDS
     FastLED.show();
     showKnobRGB(CRGB::Black);
-    analogWrite(MOTPIN, 0);
+    ledcWrite(MOT_CHAN, 0);
     beep_motor(2093,1396,1047);
-    analogWrite(MOTPIN, 0); //Turn Motor off
+    ledcWrite(MOT_CHAN, 0); //Turn Motor off
     while(!digitalRead(ENC_SW))delay(1);
     beep_motor(1047,1396,2093);
     return MANUAL ;
@@ -469,51 +466,51 @@ uint8_t set_state(uint8_t btnState, uint8_t state){
   else if(btnState == BTN_SHORT){
     switch(state){
       case MANUAL:
-        myEnc.write(sensitivity);//Whenever going into auto mode, keep the last sensitivity
+        myEnc.setCount(sensitivity);//Whenever going into auto mode, keep the last sensitivity
         motSpeed = 0; //Also reset the motor speed to 0
         return AUTO;
       case AUTO:
-        myEnc.write(0);//Whenever going into manual mode, set the speed to 0.
+        myEnc.setCount(0);//Whenever going into manual mode, set the speed to 0.
         motSpeed = 0;
-        EEPROM.update(SENSITIVITY_ADDR, sensitivity);
+        EEPROM.write(SENSITIVITY_ADDR, sensitivity);
         return MANUAL;
       case OPT_SPEED:
-        myEnc.write(0);
-        EEPROM.update(MAX_SPEED_ADDR, maxSpeed);
+        myEnc.setCount(0);
+        EEPROM.write(MAX_SPEED_ADDR, maxSpeed);
         //return OPT_RAMPSPD;
         //return OPT_BEEP;
         motSpeed = 0;
-        analogWrite(MOTPIN, motSpeed); //Turn the motor off for the white pressure monitoring mode
+        ledcWrite(MOT_CHAN, motSpeed); //Turn the motor off for the white pressure monitoring mode
         return OPT_PRES; //Skip beep and rampspeed settings for now
       case OPT_RAMPSPD: //Not yet implimented
         //motSpeed = 0;
         //myEnc.write(0);
         return OPT_BEEP;
       case OPT_BEEP:
-        myEnc.write(0);
+        myEnc.setCount(0);
         return OPT_PRES;
       case OPT_PRES:
-        myEnc.write(map(maxSpeed,0,255,0,4*(NUM_LEDS)));//start at saved value
+        myEnc.setCount(map(maxSpeed,0,255,0,4*(NUM_LEDS)));//start at saved value
         return OPT_SPEED;
     }
   }
   else if(btnState == BTN_LONG){
     switch (state) {
           case MANUAL:
-            myEnc.write(map(maxSpeed,0,255,0,4*(NUM_LEDS)));//start at saved value
+            myEnc.setCount(map(maxSpeed,0,255,0,4*(NUM_LEDS)));//start at saved value
             return OPT_SPEED;
           case AUTO:
-            myEnc.write(map(maxSpeed,0,255,0,4*(NUM_LEDS)));//start at saved value
+            myEnc.setCount(map(maxSpeed,0,255,0,4*(NUM_LEDS)));//start at saved value
             return OPT_SPEED;
           case OPT_SPEED:
-            myEnc.write(0);
+            myEnc.setCount(0);
             return MANUAL;
           case OPT_RAMPSPD:
             return MANUAL;
           case OPT_BEEP:
             return MANUAL;
           case OPT_PRES:
-            myEnc.write(0);
+            myEnc.setCount(0);
             return MANUAL;
         }
   }
@@ -525,6 +522,15 @@ void loop() {
   if(otaActive)
   {
     ArduinoOTA.handle();
+    if(!digitalRead(ENC_SW)) 
+    {
+      otaActive = false;
+      for(int i = 0; i < (NUM_LEDS>>1); i++)
+      {
+        leds[i<<1] = CRGB::Black;
+      }
+      FastLED.show();
+    }
   }
   else // Nogasm loop
   {
