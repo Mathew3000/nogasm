@@ -26,7 +26,7 @@ bool telnetActive = false;
 //Encoder
 #define ENC_SW   13 //Pushbutton on the encoder
 //Pressure Sensor Analog In
-#define BUTTPIN 12
+#define BUTTPIN 33
 #define FREQUENCY 120
 #define LED_FREQUENCY 10
 //Update/render period
@@ -96,8 +96,11 @@ void loop() {
   }
   if(otaActive)
   {
-    if(!digitalRead(ENC_SW)) otaActive = false;
     ArduinoOTA.handle();
+    if(!digitalRead(ENC_SW)) 
+    {
+      otaActive = false;
+    }
   }
   else
   {
