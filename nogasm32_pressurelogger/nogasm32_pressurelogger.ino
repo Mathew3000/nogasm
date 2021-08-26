@@ -90,6 +90,10 @@ void setup() {
 
 //=======Main Loop=============================
 void loop() {
+  if(wifiActive)
+  {
+    telnet.loop();
+  }
   if(otaActive)
   {
     if(!digitalRead(ENC_SW)) otaActive = false;
@@ -108,11 +112,12 @@ void loop() {
       // Report same date ofer telnet if available
       if(telnetActive)
       {
-        telnet.print(millis()); //Timestamp (ms)
+        telnet.print(String(millis())); //Timestamp (ms)
         telnet.print(",");
-        telnet.print(pressure); //(Original ADC value - 12 bits, 0-4095)
+        telnet.print(String(pressure)); //(Original ADC value - 12 bits, 0-4095)
         telnet.print(",");
-        telnet.println(digitalRead(ENC_SW));
+        telnet.print(String(digitalRead(ENC_SW)));
+        telnet.print("\r\n");
       }
       lastUpdate = millis();
     }
@@ -136,13 +141,12 @@ void setupTelnet() {
   telnet.onReconnect(onTelnetReconnect);
   telnet.onDisconnect(onTelnetDisconnect);
   telnet.begin();
-
 }
 
 void onTelnetConnect(String ip) {
   telnetActive = true;
   telnet.print(hostname);
-  Serial.print("Telneeet!");
+  Serial.print("Telnet!");
 }
 
 void onTelnetDisconnect(String ip) {
