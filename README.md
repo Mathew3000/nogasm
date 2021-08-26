@@ -1,4 +1,7 @@
-# mods:
+# Warning
+The pcb is not fully tested yet. Might not work as expected.
+
+# Mods:
 24 LEDs on pc edge <br/>
 ESP32 instead of a teensy/teensyduino<br/>
 Includes KiCad files<br/>
