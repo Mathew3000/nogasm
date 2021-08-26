@@ -4,6 +4,8 @@
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
 #include <FastLED.h>
+#include <ESPTelnet.h>
+
 
 #define NUM_LEDS 24
 #define DATA_PIN 16
@@ -13,8 +15,13 @@ int dir = 1;
 
 const char* ssid = "esp-update-net";
 const char* password = "supersavepw";
-const char* hostname = "nogasm32-pressurelogger";
+const char* hostname = "pressurelogger";
 bool otaActive = false;
+bool wifiActive = false;
+
+// Telnet
+ESPTelnet telnet;
+bool telnetActive = false;
 
 //Encoder
 #define ENC_SW   13 //Pushbutton on the encoder
@@ -48,7 +55,8 @@ void setup() {
   }
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
-  otaActive = (WiFi.waitForConnectResult() == WL_CONNECTED);
+  wifiActive = (WiFi.waitForConnectResult() == WL_CONNECTED);
+  otaActive = wifiActive;
   // Setup OTA only if WiFi connected
   if(otaActive)
   {
@@ -68,14 +76,16 @@ void setup() {
     }
     FastLED.show();
   }
-  else
+  if(wifiActive)
   {
-    pinMode(ENC_SW,   INPUT); //Pin to read when encoder is pressed
-    digitalWrite(ENC_SW, HIGH); // Encoder switch pullup
-    pinMode(BUTTPIN,INPUT); //default is 12 bit resolution (4096), 0-3.3
-
-    Serial.begin(115200);
+    setupTelnet();
   }
+  pinMode(ENC_SW,   INPUT); //Pin to read when encoder is pressed
+  digitalWrite(ENC_SW, HIGH); // Encoder switch pullup
+  pinMode(BUTTPIN,INPUT); //default is 12 bit resolution (4096), 0-3.3
+
+  Serial.begin(115200);
+
 }
 
 //=======Main Loop=============================
@@ -89,15 +99,21 @@ void loop() {
   {
     if (millis() - period > lastUpdate) {      
       long pressure = analogRead(BUTTPIN);
-      //Report pressure and motor data over USB for analysis / other uses. timestamps disabled by default
+      //Report pressure and motor data over USB for analysis / other uses.
       Serial.print(millis()); //Timestamp (ms)
       Serial.print(",");
-      //Serial.print(motSpeed); //Motor speed (0-255)
-      //Serial.print(",");
       Serial.print(pressure); //(Original ADC value - 12 bits, 0-4095)
       Serial.print(",");
       Serial.println(digitalRead(ENC_SW));
-      //Serial.println(constrain(100 * arousal/ (float)pLimit, 0, 100));
+      // Report same date ofer telnet if available
+      if(telnetActive)
+      {
+        telnet.print(millis()); //Timestamp (ms)
+        telnet.print(",");
+        telnet.print(pressure); //(Original ADC value - 12 bits, 0-4095)
+        telnet.print(",");
+        telnet.println(digitalRead(ENC_SW));
+      }
       lastUpdate = millis();
     }
     if(millis() - ledPeriod > lastLedCycle) 
@@ -111,4 +127,28 @@ void loop() {
       lastLedCycle = millis();
     }
   }
+}
+
+// Telnet
+void setupTelnet() {  
+  // passing on functions for various telnet events
+  telnet.onConnect(onTelnetConnect);
+  telnet.onReconnect(onTelnetReconnect);
+  telnet.onDisconnect(onTelnetDisconnect);
+  telnet.begin();
+
+}
+
+void onTelnetConnect(String ip) {
+  telnetActive = true;
+  telnet.print(hostname);
+  Serial.print("Telneeet!");
+}
+
+void onTelnetDisconnect(String ip) {
+  telnetActive = false;
+}
+
+void onTelnetReconnect(String ip) {
+  telnetActive = true;
 }
