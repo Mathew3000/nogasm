@@ -1294,7 +1294,7 @@ Wire Wire Line
 Text Label 6800 5100 0    50   ~ 0
 EN
 Text Label 6800 5700 0    50   ~ 0
-BOOT
+IO0
 Wire Wire Line
 	6700 5750 6700 5700
 Wire Wire Line
