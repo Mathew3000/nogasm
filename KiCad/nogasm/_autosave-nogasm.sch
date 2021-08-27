@@ -1242,10 +1242,10 @@ Wire Wire Line
 Wire Wire Line
 	7650 5950 7750 5950
 $Comp
-L Transistor_BJT:UMH3N Q?
+L Transistor_BJT:UMH3N Q2
 U 1 1 614BD6D8
 P 6500 5350
-F 0 "Q?" H 6790 5396 50  0000 L CNN
+F 0 "Q2" H 6790 5396 50  0000 L CNN
 F 1 "UMH3N" H 6790 5305 50  0000 L CNN
 F 2 "Package_TO_SOT_SMD:SOT-363_SC-70-6" H 6505 4910 50  0001 C CNN
 F 3 "http://rohmfs.rohm.com/en/products/databook/datasheet/discrete/transistor/digital/emh3t2r-e.pdf" H 6650 5350 50  0001 C CNN
@@ -1253,10 +1253,10 @@ F 3 "http://rohmfs.rohm.com/en/products/databook/datasheet/discrete/transistor/d
 	1    0    0    -1  
 $EndComp
 $Comp
-L Transistor_BJT:UMH3N Q?
+L Transistor_BJT:UMH3N Q2
 U 2 1 614BFA13
 P 6500 5950
-F 0 "Q?" H 6790 5996 50  0000 L CNN
+F 0 "Q2" H 6790 5996 50  0000 L CNN
 F 1 "UMH3N" H 6790 5905 50  0000 L CNN
 F 2 "Package_TO_SOT_SMD:SOT-363_SC-70-6" H 6505 5510 50  0001 C CNN
 F 3 "http://rohmfs.rohm.com/en/products/databook/datasheet/discrete/transistor/digital/emh3t2r-e.pdf" H 6650 5950 50  0001 C CNN
