@@ -68,17 +68,17 @@
 ESP32Encoder myEnc;
 
 //DIP Switches
-#define SW1PIN 32 //Dip switch pins, for setting software options without reflashing code
-#define SW2PIN 12
-#define SW3PIN 34
-#define SW4PIN 35
+#define SW1PIN 25 //Dip switch pins, for setting software options without reflashing code
+#define SW2PIN 26
+#define SW3PIN 27
+#define SW4PIN 32
 
 //Motor
 #define MOTPIN 17
 #define MOT_CHAN 0
 
 //Pressure Sensor Analog In
-#define BUTTPIN 33
+#define BUTTPIN 35
 
 //=======Software/Timing options=====================
 // OTA Settings

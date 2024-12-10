@@ -26,7 +26,7 @@ bool telnetActive = false;
 //Encoder
 #define ENC_SW   13 //Pushbutton on the encoder
 //Pressure Sensor Analog In
-#define BUTTPIN 33
+#define BUTTPIN 35
 #define FREQUENCY 120
 #define LED_FREQUENCY 10
 //Update/render period
